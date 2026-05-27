@@ -4,51 +4,65 @@
 >
 > **主流工具链**：IAR Embedded Workbench for Arm（公司约 90% MCU 项目）。少数 STM32CubeIDE+GCC legacy 项目共用本模板，spec 内对工具链差异有明确标注。
 
-## 使用方法
+## 使用方法（新 MCU 项目两步完成）
 
-### 在新 MCU 项目初始化
+### 第 1 步：跑 trellis init，同时拉 spec + bootstrap skill
 
 ```bash
 # 进入新项目目录
 cd /path/to/new-mcu-project
 
-# 跑 trellis init，附带本 registry 的模板
+# 一行命令拉两个模板
 trellis init -y --claude --codex \
   -t mcu-stm32-base \
+  -t mcu-bootstrap \
   -r http://<origin URL>/Xray/trellis-mcu-templates
 ```
 
-完成后 `.trellis/spec/` 下会出现：
+完成后：
 
 ```
-.trellis/spec/
+.trellis/spec/                    ← 来自 mcu-stm32-base (type:spec)
 ├── guides/
-│   ├── claude-codex-collaboration.md      # AI 协同硬规则
-│   └── bootstrap-checklist.md             # 模板装完后要手动做的事
+│   ├── claude-codex-collaboration.md
+│   └── bootstrap-checklist.md
 └── firmware/
-    ├── version-control.md                  # Git/SVN 双轨提交规范
-    └── coding-standard.md                  # 公司 C 编码规范
+    ├── version-control.md
+    └── coding-standard.md
+
+.claude/skills/mcu-bootstrap/     ← 来自 mcu-bootstrap (type:skill)
+└── SKILL.md                       ← 自动化引导脚本
 ```
 
-### 在已有项目追加模板（不覆盖已有 spec）
+### 第 2 步：在 Claude Code（或 Codex）里跑一次 bootstrap
+
+```
+/mcu-bootstrap
+```
+
+skill 会：
+
+1. 检测项目工具链（IAR 主流 / STM32CubeIDE+GCC legacy）
+2. 检测是否在 SVN 工作副本下
+3. 询问项目代号、初始版本号、git remote URL、是否需要 ALGO_VERSION
+4. 自动完成：
+   - 追加 `AGENTS.md`（在 TRELLIS:END 之后）
+   - 写项目根 `.gitignore`（按工具链选模板）
+   - 创建 `doc/` + `doc/README.md`
+   - 在 `User/App/System/define.h`（IAR）或 `User/App/Inc/define.h`（CubeIDE）写版本宏
+   - 设 SVN `svn:ignore` 属性（不提交 SVN）
+   - 绑定 git remote（不 push）
+5. 在 `AGENTS.md` 加 `<!-- MCU-BOOTSTRAP:DONE -->` 标记，**幂等**——重复跑会跳过
+
+### 已有项目追加 / 覆盖模式
 
 ```bash
-trellis init --append \
-  -t mcu-stm32-base \
-  -r http://<origin URL>/Xray/trellis-mcu-templates
+# 只补充缺失文件，不覆盖现有
+trellis init --append -t mcu-stm32-base -r http://<origin URL>/Xray/trellis-mcu-templates
+
+# 强制覆盖现有 spec
+trellis init --overwrite -t mcu-stm32-base -r http://<origin URL>/Xray/trellis-mcu-templates
 ```
-
-### 强制覆盖已有 spec
-
-```bash
-trellis init --overwrite \
-  -t mcu-stm32-base \
-  -r http://<origin URL>/Xray/trellis-mcu-templates
-```
-
-## 装完模板后的手动步骤
-
-`trellis init -t` 只能写入 `.trellis/spec/`。**项目根级的配置文件（`.gitignore`、`AGENTS.md` 附录、`doc/` 目录命名约定）需要参考新项目内 `.trellis/spec/guides/bootstrap-checklist.md` 手动完成**。
 
 ## 当前模板清单
 
@@ -56,7 +70,8 @@ trellis init --overwrite \
 
 | ID | 类型 | 适用场景 |
 |---|---|---|
-| `mcu-stm32-base` | spec | 通用 MCU 固件项目（覆盖 AI 协同 + 提交规范 + 编码规范） |
+| `mcu-stm32-base` | spec | 通用 MCU 固件 spec 套件（AI 协同 + 提交规范 + 编码规范） |
+| `mcu-bootstrap` | skill | trellis init 之后一键收尾（写 .gitignore / AGENTS / svn:ignore / 版本宏 / git remote） |
 
 ## 维护规则
 

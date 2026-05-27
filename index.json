@@ -8,6 +8,14 @@
       "description": "Common STM32/GD32 MCU firmware spec set: AI Claude/Codex collaboration rules, Git/SVN dual-track version control, and company C coding standard. Defaults to IAR Embedded Workbench (company mainstream, ~90%); STM32CubeIDE+GCC notes included for the few legacy projects.",
       "path": "specs/mcu-stm32-base",
       "tags": ["mcu", "stm32", "firmware", "trellis", "claude", "codex"]
+    },
+    {
+      "id": "mcu-bootstrap",
+      "type": "skill",
+      "name": "MCU Project Bootstrap",
+      "description": "One-shot interactive skill that finishes the project-root configuration after `trellis init -t mcu-stm32-base` — appends AGENTS.md, writes .gitignore, creates doc/, injects version macros into define.h, sets svn:ignore, optionally binds git remote. Idempotent. Use after a fresh trellis init in a new MCU firmware project.",
+      "path": "skills/mcu-bootstrap",
+      "tags": ["mcu", "bootstrap", "init", "automation", "trellis"]
     }
   ]
 }
