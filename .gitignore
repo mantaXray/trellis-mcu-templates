@@ -1,0 +1,14 @@
+# Editor / OS junk
+*.swp
+*~
+*.bak
+*.orig
+~$*
+
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local trellis runtime (in case anyone trellis-inits inside this repo accidentally)
+.trellis/.runtime/
+.trellis/.backup-*/

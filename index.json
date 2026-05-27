@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "mcu-stm32-base",
+      "type": "spec",
+      "name": "STM32 MCU Base Spec",
+      "description": "Common STM32 firmware spec set: AI Claude/Codex collaboration rules, Git/SVN dual-track version control, and company C coding standard. Suitable for any STM32 / GD32 MCU project using STM32CubeIDE+GCC or IAR.",
+      "path": "specs/mcu-stm32-base",
+      "tags": ["mcu", "stm32", "firmware", "trellis", "claude", "codex"]
+    }
+  ]
+}
