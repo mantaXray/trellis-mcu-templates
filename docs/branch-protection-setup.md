@@ -2,7 +2,7 @@
 
 > 给希望"接手维护本仓库"的人保留一道审核闸门。Owner（你自己）也建议走 PR 流程，避免直接推 main 时绕过 CI。
 >
-> 优先级：**公司 Gitea (origin) > Gitee > GitHub**。Gitea 是团队真实协作的主战场，必须配；Gitee/GitHub 是个人镜像，按需配。GitHub 在 free personal + private 账户下**服务端保护机制基本不可用**（详见 §GitHub 一节），可以直接跳过它的服务端保护。
+> 优先级：**私有 Git 镜像 (origin) > Gitee > GitHub**。Gitea 是团队真实协作的主战场，必须配；Gitee/GitHub 是个人镜像，按需配。GitHub 在 free personal + private 账户下**服务端保护机制基本不可用**（详见 §GitHub 一节），可以直接跳过它的服务端保护。
 >
 > 注意服务端保护被绕过时，**本地 pre-push hook + 个人讨厌 force push 的习惯**仍然是有效的最后一道防线。
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 公司 Gitea (origin)  —— 优先级最高，必须配
+## 私有 Git 镜像 (origin)  —— 优先级最高，必须配
 
 团队真实协作发生在这里，没有 free/paid 限制，所有规则都能用。
 
@@ -34,7 +34,7 @@
    - ✅ **Block on outdated branch**
 5. 保存
 
-> Gitea 1.19+ 也支持 Gitea Actions 做 status check；如果公司 Gitea 开了 Actions 并跑了 validator workflow，可在 **Status Check Patterns** 里加 `validate`。如果没开 Actions，靠人工 review 也够。
+> Gitea 1.19+ 也支持 Gitea Actions 做 status check；如果私有 Git 镜像 开了 Actions 并跑了 validator workflow，可在 **Status Check Patterns** 里加 `validate`。如果没开 Actions，靠人工 review 也够。
 
 ---
 

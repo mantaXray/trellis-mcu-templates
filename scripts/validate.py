@@ -321,6 +321,10 @@ if not (REPO_ROOT / "docs" / "MAINTENANCE.md").exists():
 if not (REPO_ROOT / "docs" / "branch-protection-setup.md").exists():
     fail("docs/branch-protection-setup.md is missing (remote branch protection guide)")
 
+# Open-source license file (required since repo is intended for public release).
+if not (REPO_ROOT / "LICENSE").exists():
+    fail("LICENSE file is missing (required for open-source distribution)")
+
 
 def load_template(name: str) -> str:
     return (TEMPLATES_DIR / name).read_text(encoding="utf-8")

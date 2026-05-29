@@ -4,11 +4,17 @@
 
 ## 2026-05-29
 
-- FIX: `docs/branch-protection-setup.md` 大幅重排：实测 GitHub 在 free personal + private 仓库下**两套机制都封了**——Rulesets 完全不可用，Branch protection rules 可创建但不强制执行（"won't be enforced... until you move to a GitHub Team or Enterprise organization account"）。文档优先级改为 **Gitea (主战场) > Gitee > GitHub (实质无服务端保护)**。给出 3 个对应选项：接受现状（推荐，靠 pre-push hook + Gitea 保护）、付费、改 public。
+- ADD: 仓库开源准备（Phase 1）：
+  - 新增 `LICENSE` (MIT)，2026 © mantaXray
+  - README.md 加「外部读者」简介块，说明本仓库定位 + 默认设定可调整
+  - 各处「公司 Gitea」等措辞统一改为「私有 Git 镜像」，避免假设外部读者也是公司团队
+  - `scripts/validate.py` 新增 LICENSE 存在性断言
+  - Phase 2（commit 历史 email 脱敏）将在下一个 commit 后用 `git filter-repo --email-callback` 处理，再 force push 三个 remote
+- FIX: `docs/branch-protection-setup.md` 大幅重排：实测 GitHub 在 free personal + private 仓库下**两套机制都封了**——Rulesets 完全不可用，Branch protection rules 可创建但不强制执行（"won't be enforced... until you move to a GitHub Team or Enterprise organization account"）。文档优先级改为 **私有 Git 镜像 (主战场) > Gitee > GitHub (实质无服务端保护)**。给出 3 个对应选项：接受现状（推荐，靠 pre-push hook + 私有 Git 镜像保护）、付费、改 public。
 - FIX: `docs/branch-protection-setup.md` GitHub 章节再次调整：实测 GitHub 限制 Rulesets 在 free personal + private 仓库里不可用（必须 Pro 付费或 Team Organization）。当前推荐路径改回 Branch protection rules（老版，free 可用）；Rulesets 降为"仓库 public 或账户升级后的迁移路径"。
 - FIX: `docs/branch-protection-setup.md` GitHub 章节改以 **Repository Rulesets**（2023 新版）为推荐路径，旧版 Branch protection rules 降为"兼容路径"。Rulesets 颗粒度更细、跨分支可复用、bypass 控制更精细，是 GitHub 当前演进方向。
 - ADD: README.md 顶部加「谁应该读这个文档？」3 行分流块，把下游用户和接手维护者分开引导。下游用户继续看「使用方法」，新维护者直接跳到 `docs/MAINTENANCE.md`。
-- ADD: `docs/branch-protection-setup.md` 详细说明 GitHub / Gitee / 公司 Gitea 三个 remote 各自怎么配 branch protection（强制 PR + CI 绿才能合并）。MAINTENANCE.md S.6 新增一行指向。
+- ADD: `docs/branch-protection-setup.md` 详细说明 GitHub / Gitee / 私有 Git 镜像三个 remote 各自怎么配 branch protection（强制 PR + CI 绿才能合并）。MAINTENANCE.md S.6 新增一行指向。
 - FIX: `scripts/push-all.sh` origin 失败提示里去掉硬编码内网 IP，改为运行时从 `git remote get-url origin` 读取。仓库现在是 private 没影响；如果未来开源能避免内网信息泄漏（注意 git 历史里旧 IP 仍在，开源前需用 `git filter-repo` 清理）。
 - ADD: `docs/MAINTENANCE.md` 顶部加 Supervisor 模式专节（S.1~S.6），明确"人 supervisor + AI 执行"的分工。原 §0~§10 详细 SOP 降级为 AI 自己执行时查阅的参考，人类不必逐行学。新增"spec/pitfall 内容也是 AI 写，人只口述需求 + review"的关键认知。
 - ADD: `scripts/push-all.sh` 一键推送三个 remote（origin / gitee / github）。单个 remote 失败不中断，按 remote 类型给针对性修复建议（VPN / SSH / HTTP 代理）。

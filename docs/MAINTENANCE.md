@@ -198,13 +198,13 @@ python scripts/validate.py
 git add specs/mcu-stm32-base/firmware/pitfalls.md
 git commit -m "fix(pitfalls): clarify PIT-DMA-001 boundary"
 
-# 4. 推送到所有 remote（公司 Gitea + Gitee + GitHub）
+# 4. 推送到所有 remote（私有 Git 镜像 + Gitee + GitHub）
 bash scripts/push-all.sh
 ```
 
 **绝对不要在 validator 红的时候 push**。validator 红意味着仓库不自洽，下游 `trellis init` 拉到的内容会有问题。
 
-**关于 `scripts/push-all.sh`**：依次推送 origin / gitee / github 三个 remote，单个 remote 失败不中断后续。任一失败会按 remote 类型给出针对性修复建议（公司 Gitea 检查 VPN、Gitee 检查外网、GitHub 切网络/SSH/代理）。如果只想推单个 remote，仍可用 `git push <remote> main`。
+**关于 `scripts/push-all.sh`**：依次推送 origin / gitee / github 三个 remote，单个 remote 失败不中断后续。任一失败会按 remote 类型给出针对性修复建议（私有 Git 镜像检查 VPN、Gitee 检查外网、GitHub 切网络/SSH/代理）。如果只想推单个 remote，仍可用 `git push <remote> main`。
 
 ### 2.2 改"内嵌副本"的内容
 

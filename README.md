@@ -4,6 +4,8 @@
 >
 > 支持按项目实际选择 IAR Embedded Workbench for Arm、STM32CubeIDE+GCC 或其他 MCU 工具链；spec 内仅保留通用差异提示。
 
+> **外部读者**：本仓库是 [mantaXray](https://github.com/mantaXray) 团队 MCU 固件实践沉淀出来的 Trellis 模板，开源（MIT）给同类需求的团队参考。示例工具链组合（IAR/CubeIDE 任选、Git+SVN 双轨、私有 Git 镜像 + GitHub/Gitee）按你实际情况调整；pitfall 知识库和 AI 协同规则可以直接复用。
+
 > **谁应该读这个文档？**
 > - 你要在**新 MCU 项目里用这个模板** → 看下面「使用方法」一节，跑两步命令就能用
 > - 你要**接手维护本仓库** → 跳到 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md)，顶部"Supervisor 模式"是新人入门

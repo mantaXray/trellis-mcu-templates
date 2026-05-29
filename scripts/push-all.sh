@@ -63,8 +63,8 @@ for remote in "${FAILED[@]}"; do
   case "$remote" in
     origin)
       origin_url="$(git remote get-url origin 2>/dev/null || echo '<origin URL>')"
-      echo "  [origin / 公司 Gitea]"
-      echo "    - 检查公司 VPN / 内网连接"
+      echo "  [origin / 私有 Git 镜像]"
+      echo "    - 检查 VPN / 私有网络连接"
       echo "    - 确认 origin 可达：curl -I \"$origin_url\""
       echo "    - 修好网络后重试：git push origin $BRANCH"
       ;;
@@ -79,7 +79,7 @@ for remote in "${FAILED[@]}"; do
       echo "  [github / 国际个人]"
       echo "    GitHub HTTPS 在国内常被重置/超时。按以下任一方式处理："
       echo ""
-      echo "    A. 切换到能访问 GitHub 的网络（手机热点 / VPN / 公司专线）"
+      echo "    A. 切换到能访问 GitHub 的网络（手机热点 / VPN / 其他可访问外网的线路）"
       echo "       然后重试：git push github $BRANCH"
       echo ""
       echo "    B. 改用 SSH（前提是 GitHub 账户已配 SSH key）："
