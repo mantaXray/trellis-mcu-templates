@@ -218,6 +218,10 @@ assert_contains(push_all, r"GIT_TERMINAL_PROMPT=0",
                 "push-all.sh should disable interactive git prompts during automation")
 assert_contains(push_all, r"GCM_INTERACTIVE=never",
                 "push-all.sh should keep Git Credential Manager non-interactive during automation")
+assert_contains(push_all, r"PUSH_TIMEOUT_SECONDS",
+                "push-all.sh should bound git push duration so one remote cannot block the workflow")
+assert_contains(push_all, r"timeout \"\$PUSH_TIMEOUT_SECONDS\" git push",
+                "push-all.sh should run git push through timeout when available")
 
 # .gitignore order check inside the checklist
 m = re.search(r"```gitignore\s*(.*?)```", checklist, flags=re.DOTALL)

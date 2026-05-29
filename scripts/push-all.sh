@@ -25,11 +25,23 @@ SHA="$(git rev-parse --short HEAD)"
 DIRECT_REMOTES=(origin gitee)
 GITHUB_REMOTE=github
 GITHUB_REPO=mantaXray/trellis-mcu-templates
+PUSH_TIMEOUT_SECONDS="${PUSH_TIMEOUT_SECONDS:-30}"
 FAILED=()
 
 # 自动化脚本不能卡在交互式凭据提示；失败后进入总结区给修复建议。
 export GIT_TERMINAL_PROMPT=0
 export GCM_INTERACTIVE=never
+
+run_git_push() {
+  local remote="$1"
+  shift
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$PUSH_TIMEOUT_SECONDS" git push "$remote" "$@"
+  else
+    git push "$remote" "$@"
+  fi
+}
 
 # ----- 定位 gh CLI（PATH 可能没刷新认不到全局命令） -----
 GH_BIN=""
@@ -59,7 +71,7 @@ echo ""
 # ----- 2. origin / gitee 直接 push -----
 for remote in "${DIRECT_REMOTES[@]}"; do
   echo "==> git push $remote $BRANCH"
-  if git push "$remote" "$BRANCH"; then
+  if run_git_push "$remote" "$BRANCH"; then
     echo "    [$remote] OK"
   else
     echo "    [$remote] FAILED"
@@ -71,7 +83,7 @@ done
 # ----- 3. github：非 main 直推，main 走 PR -----
 if [ "$BRANCH" != "main" ]; then
   echo "==> git push $GITHUB_REMOTE $BRANCH  (非 main 分支，Rulesets 不拦)"
-  if git push "$GITHUB_REMOTE" "$BRANCH"; then
+  if run_git_push "$GITHUB_REMOTE" "$BRANCH"; then
     echo "    [$GITHUB_REMOTE] OK"
   else
     echo "    [$GITHUB_REMOTE] FAILED"
@@ -95,7 +107,7 @@ else
   else
     # 推 feature branch
     echo "    [github] 推 feature branch..."
-    if ! git push "$GITHUB_REMOTE" "$BRANCH:refs/heads/$PR_BRANCH"; then
+    if ! run_git_push "$GITHUB_REMOTE" "$BRANCH:refs/heads/$PR_BRANCH"; then
       echo "    [github] feature branch push 失败"
       FAILED+=("$GITHUB_REMOTE")
     else
@@ -168,7 +180,7 @@ EOF
                 git fetch "$GITHUB_REMOTE" >/dev/null 2>&1 || true
                 git reset --hard "$GITHUB_REMOTE/$BRANCH" >/dev/null 2>&1
                 for r in "${DIRECT_REMOTES[@]}"; do
-                  if ! git push "$r" "$BRANCH" >/dev/null 2>&1; then
+                  if ! run_git_push "$r" "$BRANCH" >/dev/null 2>&1; then
                     echo "    [warn] sync push $r 失败，需手动 git push $r $BRANCH"
                     FAILED+=("$r(待 sync)")
                   fi
