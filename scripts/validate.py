@@ -226,6 +226,10 @@ assert_contains(push_all, r"wait_for_pr_checks_to_appear",
                 "push-all.sh should wait for GitHub checks to be registered before watching them")
 assert_contains(push_all, r"CHECK_DISCOVERY_TIMEOUT_SECONDS",
                 "push-all.sh should bound how long it waits for GitHub checks to appear")
+assert_contains(push_all, r"mark_failed\(\)",
+                "push-all.sh should de-duplicate failed remotes before printing remediation commands")
+assert_not_contains(push_all, r'FAILED\+=\("\$r\(待 sync\)"\)',
+                    "push-all.sh should keep retryable remote names executable in failure summaries")
 
 # .gitignore order check inside the checklist
 m = re.search(r"```gitignore\s*(.*?)```", checklist, flags=re.DOTALL)

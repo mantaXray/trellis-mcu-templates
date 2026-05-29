@@ -34,6 +34,19 @@ FAILED=()
 export GIT_TERMINAL_PROMPT=0
 export GCM_INTERACTIVE=never
 
+mark_failed() {
+  local item="$1"
+  local existing=""
+
+  for existing in "${FAILED[@]}"; do
+    if [ "$existing" = "$item" ]; then
+      return 0
+    fi
+  done
+
+  FAILED+=("$item")
+}
+
 run_git_push() {
   local remote="$1"
   shift
@@ -98,7 +111,7 @@ for remote in "${DIRECT_REMOTES[@]}"; do
     echo "    [$remote] OK"
   else
     echo "    [$remote] FAILED"
-    FAILED+=("$remote")
+    mark_failed "$remote"
   fi
   echo ""
 done
@@ -110,7 +123,7 @@ if [ "$BRANCH" != "main" ]; then
     echo "    [$GITHUB_REMOTE] OK"
   else
     echo "    [$GITHUB_REMOTE] FAILED"
-    FAILED+=("$GITHUB_REMOTE")
+    mark_failed "$GITHUB_REMOTE"
   fi
   echo ""
 else
@@ -132,7 +145,7 @@ else
     echo "    [github] 推 feature branch..."
     if ! run_git_push "$GITHUB_REMOTE" "$BRANCH:refs/heads/$PR_BRANCH"; then
       echo "    [github] feature branch push 失败"
-      FAILED+=("$GITHUB_REMOTE")
+      mark_failed "$GITHUB_REMOTE"
     else
       if [ -z "$GH_BIN" ] || ! "$GH_BIN" auth status >/dev/null 2>&1; then
         # 没 gh 或没认证：打印 URL 让用户手动 merge
@@ -147,7 +160,7 @@ else
         echo "       git push origin main && git push gitee main"
         echo "       git push $GITHUB_REMOTE --delete $PR_BRANCH"
         echo ""
-        FAILED+=("$GITHUB_REMOTE(手动 PR 待 merge)")
+        mark_failed "$GITHUB_REMOTE(手动 PR 待 merge)"
       else
         # gh 全自动流程
         echo "    [github] 创建 PR..."
@@ -169,26 +182,26 @@ EOF
         if [ "$pr_create_status" -ne 0 ] || [ -z "$pr_url" ]; then
           echo "    [github] gh pr create 失败"
           printf '%s\n' "$pr_create_output" | sed 's/^/      /'
-          FAILED+=("$GITHUB_REMOTE")
+          mark_failed "$GITHUB_REMOTE"
         else
           echo "    [github] PR: $pr_url"
           echo "    [github] 等 CI check 挂载..."
           if ! wait_for_pr_checks_to_appear "$pr_url"; then
             echo "    [github] 超时仍未看到 CI check。手动处理：$pr_url"
-            FAILED+=("$GITHUB_REMOTE")
+            mark_failed "$GITHUB_REMOTE"
             echo ""
           else
             echo "    [github] 等 CI（进度直出，不再静默）..."
             # 不用 --required：Rulesets 没标 required check 时会秒退假装通过
             if ! "$GH_BIN" pr checks "$pr_url" --repo "$GITHUB_REPO" --watch --fail-fast; then
               echo "    [github] CI 未通过。手动处理：$pr_url"
-              FAILED+=("$GITHUB_REMOTE")
+              mark_failed "$GITHUB_REMOTE"
             else
               echo "    [github] CI 通过 ✓"
               echo "    [github] 合并 PR (admin self-merge)..."
               if ! "$GH_BIN" pr merge "$pr_url" --repo "$GITHUB_REPO" --merge --admin --delete-branch; then
                 echo "    [github] merge 失败。手动处理：$pr_url"
-                FAILED+=("$GITHUB_REMOTE")
+                mark_failed "$GITHUB_REMOTE"
               else
                 echo "    [github] merged + branch deleted ✓"
 
@@ -198,12 +211,12 @@ EOF
                   echo "    [warn] 等 CI 期间本地 HEAD 动过 ($local_head → $current_head)"
                   echo "           跳过 reset --hard，自己 sync："
                   echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
-                  FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
+                  mark_failed "$GITHUB_REMOTE(已 merge，本地待手动 sync)"
                 elif ! git diff --quiet || ! git diff --cached --quiet; then
                   echo "    [warn] working tree 有未提交改动，跳过 reset --hard"
                   echo "           处理完改动后自己 sync："
                   echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
-                  FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
+                  mark_failed "$GITHUB_REMOTE(已 merge，本地待手动 sync)"
                 else
                   echo "    [github] sync 本地 + origin + gitee..."
                   git fetch "$GITHUB_REMOTE" >/dev/null 2>&1 || true
@@ -211,7 +224,7 @@ EOF
                   for r in "${DIRECT_REMOTES[@]}"; do
                     if ! run_git_push "$r" "$BRANCH" >/dev/null 2>&1; then
                       echo "    [warn] sync push $r 失败，需手动 git push $r $BRANCH"
-                      FAILED+=("$r(待 sync)")
+                      mark_failed "$r"
                     fi
                   done
                   echo "    [github] 全部到 $(git rev-parse --short HEAD)"
