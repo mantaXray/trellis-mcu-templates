@@ -4,6 +4,12 @@
 
 ## 2026-05-29
 
+- ADD: **GitHub 仓库正式开源**（mantaXray/trellis-templates，MIT License）：
+  - 内网 IP 全历史已清（`git filter-repo` 替换 + force push 三 remote）
+  - Commit 作者邮箱全历史替换为 `mantaXray@users.noreply.github.com`（PII 脱敏，未来定了正式邮箱可再替换）
+  - 仓库可见性切为 public
+  - Repository Rulesets 已启用：强制 PR + `validate` CI 绿才能合并 main，禁止 force push 和删除分支
+  - GitHub About 加 Description + 10 个 Topics（mcu/stm32/firmware/embedded/trellis/claude-code/codex/ai-coding/iar/freertos），提高发现率
 - ADD: 仓库开源准备（Phase 1）：
   - 新增 `LICENSE` (MIT)，2026 © mantaXray
   - README.md 加「外部读者」简介块，说明本仓库定位 + 默认设定可调整
