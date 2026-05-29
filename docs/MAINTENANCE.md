@@ -204,7 +204,11 @@ bash scripts/push-all.sh
 
 **绝对不要在 validator 红的时候 push**。validator 红意味着仓库不自洽，下游 `trellis init` 拉到的内容会有问题。
 
-**关于 `scripts/push-all.sh`**：依次推送 origin / gitee / github 三个 remote，单个 remote 失败不中断后续。任一失败会按 remote 类型给出针对性修复建议（私有 Git 镜像检查 VPN、Gitee 检查外网、GitHub 切网络/SSH/代理）。如果只想推单个 remote，仍可用 `git push <remote> main`。
+**关于 `scripts/push-all.sh`**：
+- **origin / gitee**：直接 push（这两个 remote 允许 owner force push）
+- **github (main 分支)**：自动 PR 流程——建 `auto/<short-sha>` feature branch → `gh pr create` → 等 CI → admin self-merge → 删 branch → sync 本地和其他 remote。需要 gh CLI 已认证；未认证时回退到打印手动 PR URL，让你网页点 merge 后再跑同步命令。
+- **github (非 main 分支)**：直接 push（Rulesets 只拦 main）
+- 单个 remote 失败不中断后续。任一失败给针对性修复建议（VPN / SSH / 代理 / gh auth 等）。
 
 ### 2.2 改"内嵌副本"的内容
 

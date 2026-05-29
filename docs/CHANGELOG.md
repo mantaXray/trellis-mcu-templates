@@ -4,6 +4,12 @@
 
 ## 2026-05-29
 
+- ADD: `scripts/push-all.sh` 升级到自动 PR 流程：
+  - origin / gitee 保持直推
+  - github main 分支自动建 `auto/<sha>` feature branch → `gh pr create --fill` → `gh pr checks --watch` 等 CI → `gh pr merge --admin --delete-branch` → 自动 fetch + reset + sync origin/gitee
+  - gh CLI 未认证时回退到推 branch + 打印 PR URL 让用户手动 merge
+  - github 非 main 分支直接 push（Rulesets 只拦 main）
+  - MAINTENANCE.md §2.1 更新对应流程说明
 - ADD: **GitHub 仓库正式开源**（mantaXray/trellis-templates，MIT License）：
   - 内网 IP 全历史已清（`git filter-repo` 替换 + force push 三 remote）
   - Commit 作者邮箱全历史替换为 `mantaXray@users.noreply.github.com`（PII 脱敏，未来定了正式邮箱可再替换）

@@ -1,30 +1,47 @@
 #!/usr/bin/env bash
 # scripts/push-all.sh
 #
-# 把当前分支 push 到所有已配置的 trellis-mcu-templates remote
-# (origin / gitee / github)。
+# 把当前分支推送到所有 trellis-mcu-templates remote。
 #
-# 设计：
-#   - 单个 remote 推送失败不中断后续 remote，所有 remote 跑完再总结
-#   - 任一失败都按 remote 类型给出具体修复建议（切网络、走 SSH、配代理等）
-#   - 推送前先跑一次 validate.py 防止把坏内容推出去
+# 行为差异：
+#   - origin (私有 Git 镜像) / gitee  → 直接 push（这些 remote 允许 Xray force push）
+#   - github                         → 走 PR 工作流（Rulesets 强制 PR + CI 绿 + 禁止直推 main）
+#
+# GitHub PR 流程（在 main 分支上）：
+#   - 有 gh CLI 已认证 → 自动建 feature branch + gh pr create + 等 CI + admin self-merge + sync 本地
+#   - 没 gh CLI / 未认证 → 推 feature branch，打印 PR URL，让你网页点 merge 后再 sync
+#
+# 非 main 分支：所有 remote 直接 push（Rulesets 只拦 main）
 #
 # 用法：bash scripts/push-all.sh
 
 set -u
 
-# cd 到仓库根
 cd "$(dirname "$0")/.."
 
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-REMOTES=(origin gitee github)
+SHA="$(git rev-parse --short HEAD)"
+DIRECT_REMOTES=(origin gitee)
+GITHUB_REMOTE=github
 FAILED=()
 
-echo "==> Branch: $BRANCH"
-echo "==> Remotes: ${REMOTES[*]}"
+# ----- 定位 gh CLI（PATH 可能没刷新认不到全局命令） -----
+GH_BIN=""
+if command -v gh >/dev/null 2>&1; then
+  GH_BIN="gh"
+elif [ -x "/c/Program Files/GitHub CLI/gh.exe" ]; then
+  GH_BIN="/c/Program Files/GitHub CLI/gh.exe"
+fi
+
+echo "==> Branch: $BRANCH @ $SHA"
+if [ -n "$GH_BIN" ]; then
+  echo "==> gh CLI: $GH_BIN"
+else
+  echo "==> gh CLI: 未找到（github 将回退到手动 PR URL 模式）"
+fi
 echo ""
 
-# 1. 前置验证（fail fast）
+# ----- 1. 前置 validate（fail fast） -----
 echo "==> Running scripts/validate.py..."
 if ! python scripts/validate.py; then
   echo "" >&2
@@ -33,8 +50,8 @@ if ! python scripts/validate.py; then
 fi
 echo ""
 
-# 2. 依次 push 每个 remote
-for remote in "${REMOTES[@]}"; do
+# ----- 2. origin / gitee 直接 push -----
+for remote in "${DIRECT_REMOTES[@]}"; do
   echo "==> git push $remote $BRANCH"
   if git push "$remote" "$BRANCH"; then
     echo "    [$remote] OK"
@@ -45,18 +62,100 @@ for remote in "${REMOTES[@]}"; do
   echo ""
 done
 
-# 3. 总结
+# ----- 3. github：非 main 直推，main 走 PR -----
+if [ "$BRANCH" != "main" ]; then
+  echo "==> git push $GITHUB_REMOTE $BRANCH  (非 main 分支，Rulesets 不拦)"
+  if git push "$GITHUB_REMOTE" "$BRANCH"; then
+    echo "    [$GITHUB_REMOTE] OK"
+  else
+    echo "    [$GITHUB_REMOTE] FAILED"
+    FAILED+=("$GITHUB_REMOTE")
+  fi
+  echo ""
+else
+  # main 分支 → PR 工作流
+  PR_BRANCH="auto/$SHA"
+  echo "==> github PR 流程（Rulesets 禁止直推 main）"
+  echo "    feature branch: $PR_BRANCH"
+
+  # 检查 github 是否已经 up-to-date（避免无意义 PR）
+  git fetch "$GITHUB_REMOTE" "$BRANCH" >/dev/null 2>&1 || true
+  github_head="$(git rev-parse "$GITHUB_REMOTE/$BRANCH" 2>/dev/null || echo '')"
+  local_head="$(git rev-parse HEAD)"
+  if [ "$github_head" = "$local_head" ]; then
+    echo "    [github] 已经是最新（$SHA），跳过 PR"
+    echo ""
+  else
+    # 推 feature branch
+    echo "    [github] 推 feature branch..."
+    if ! git push "$GITHUB_REMOTE" "$BRANCH:refs/heads/$PR_BRANCH" 2>&1 | tail -3; then
+      echo "    [github] feature branch push 失败"
+      FAILED+=("$GITHUB_REMOTE")
+    else
+      if [ -z "$GH_BIN" ] || ! "$GH_BIN" auth status >/dev/null 2>&1; then
+        # 没 gh 或没认证：打印 URL 让用户手动 merge
+        echo ""
+        echo "    [github] gh CLI 不可用或未认证 → 切手动 PR 模式"
+        echo ""
+        echo "    👉 创建 PR 并 merge："
+        echo "       https://github.com/mantaXray/trellis-templates/pull/new/$PR_BRANCH"
+        echo ""
+        echo "    merge 后跑下面命令同步本地和其他 remote："
+        echo "       git fetch $GITHUB_REMOTE && git reset --hard $GITHUB_REMOTE/main"
+        echo "       git push origin main && git push gitee main"
+        echo "       git push $GITHUB_REMOTE --delete $PR_BRANCH"
+        echo ""
+        FAILED+=("$GITHUB_REMOTE(手动 PR 待 merge)")
+      else
+        # gh 全自动流程
+        echo "    [github] 创建 PR..."
+        pr_url=$("$GH_BIN" pr create \
+          --base "$BRANCH" \
+          --head "$PR_BRANCH" \
+          --fill 2>&1 | grep -oE 'https://github.com/[^[:space:]]*' | tail -1)
+        if [ -z "$pr_url" ]; then
+          echo "    [github] gh pr create 失败"
+          FAILED+=("$GITHUB_REMOTE")
+        else
+          echo "    [github] PR: $pr_url"
+          echo "    [github] 等 CI..."
+          if ! "$GH_BIN" pr checks "$pr_url" --watch --required >/dev/null 2>&1; then
+            echo "    [github] CI 未通过。手动处理：$pr_url"
+            FAILED+=("$GITHUB_REMOTE")
+          else
+            echo "    [github] CI 通过 ✓"
+            echo "    [github] 合并 PR (admin self-merge)..."
+            if ! "$GH_BIN" pr merge "$pr_url" --merge --admin --delete-branch >/dev/null 2>&1; then
+              echo "    [github] merge 失败。手动处理：$pr_url"
+              FAILED+=("$GITHUB_REMOTE")
+            else
+              echo "    [github] merged + branch deleted ✓"
+              echo "    [github] sync 本地 + origin + gitee..."
+              git fetch "$GITHUB_REMOTE" >/dev/null 2>&1
+              git reset --hard "$GITHUB_REMOTE/$BRANCH" >/dev/null 2>&1
+              for r in "${DIRECT_REMOTES[@]}"; do
+                git push "$r" "$BRANCH" >/dev/null 2>&1 || \
+                  echo "    [warn] sync push $r 失败，需手动 git push $r $BRANCH"
+              done
+              echo "    [github] 全部到 $(git rev-parse --short HEAD)"
+            fi
+          fi
+        fi
+      fi
+    fi
+    echo ""
+  fi
+fi
+
+# ----- 4. 总结 -----
 if [ ${#FAILED[@]} -eq 0 ]; then
-  echo "==> All ${#REMOTES[@]} remotes pushed successfully."
+  echo "==> 全部 remote 同步成功 ($(git rev-parse --short HEAD))"
   exit 0
 fi
 
 echo "==================================================="
-echo "  推送失败：${#FAILED[@]} / ${#REMOTES[@]} 个 remote 没推上去"
-echo "  失败列表：${FAILED[*]}"
+echo "  ${#FAILED[@]} 个 remote 没成功：${FAILED[*]}"
 echo "==================================================="
-echo ""
-echo "针对失败 remote 的修复建议："
 echo ""
 
 for remote in "${FAILED[@]}"; do
@@ -75,38 +174,22 @@ for remote in "${FAILED[@]}"; do
       echo "    - 持续失败可改 SSH："
       echo "        git remote set-url gitee git@gitee.com:manta-xray/trellis-templates.git"
       ;;
-    github)
+    github*)
       echo "  [github / 国际个人]"
-      echo "    GitHub HTTPS 在国内常被重置/超时。按以下任一方式处理："
+      echo "    可能原因："
+      echo "    1. Clash Verge 没开 / 代理端口不对（默认 7897）"
+      echo "    2. gh CLI 未认证（跑 'gh auth login'）"
+      echo "    3. PR 等待 merge（按上面打印的 URL 处理）"
+      echo "    4. CI 红了（看 PR 页面 Actions tab）"
       echo ""
-      echo "    A. 切换到能访问 GitHub 的网络（手机热点 / VPN / 其他可访问外网的线路）"
-      echo "       然后重试：git push github $BRANCH"
-      echo ""
-      echo "    B. 改用 SSH（前提是 GitHub 账户已配 SSH key）："
-      echo "       git remote set-url github git@github.com:mantaXray/trellis-templates.git"
-      echo "       git push github $BRANCH"
-      echo ""
-      echo "    C. 临时走本地代理（假设本地代理在 127.0.0.1:7890）："
-      echo "       git config --global http.https://github.com.proxy http://127.0.0.1:7890"
-      echo "       git push github $BRANCH"
-      echo "       git config --global --unset http.https://github.com.proxy   # 推完撤掉"
+      echo "    重试整个流程：bash scripts/push-all.sh"
       ;;
     *)
       echo "  [$remote]"
-      echo "    - 修好网络/权限后重试：git push $remote $BRANCH"
+      echo "    - 处理后重试：git push $remote $BRANCH"
       ;;
   esac
   echo ""
 done
-
-echo "==================================================="
-echo "  ⚠️  请处理网络/认证问题后，单独重推失败的 remote："
-echo "==================================================="
-for remote in "${FAILED[@]}"; do
-  echo "    git push $remote $BRANCH"
-done
-echo ""
-echo "  或重跑本脚本：bash scripts/push-all.sh"
-echo ""
 
 exit 1
