@@ -4,6 +4,7 @@
 
 ## 2026-05-29
 
+- ADD: `scripts/push-all.sh` 一键推送三个 remote（origin / gitee / github）。单个 remote 失败不中断，按 remote 类型给针对性修复建议（VPN / SSH / HTTP 代理）。
 - ADD: `docs/MAINTENANCE.md` 维护手册（10 章 + 2 附录），覆盖日常编辑、反哺、CI、变更记录、节奏、紧急情况。
 - ADD: pre-push hook 模板（见 `MAINTENANCE.md` §6.3），每次 `git push` 自动跑 `validate.py`。维护者本地安装一次。
 - ADD: `docs/CHANGELOG.md` 起步（本文件）。
