@@ -222,6 +222,10 @@ assert_contains(push_all, r"PUSH_TIMEOUT_SECONDS",
                 "push-all.sh should bound git push duration so one remote cannot block the workflow")
 assert_contains(push_all, r"timeout \"\$PUSH_TIMEOUT_SECONDS\" git push",
                 "push-all.sh should run git push through timeout when available")
+assert_contains(push_all, r"wait_for_pr_checks_to_appear",
+                "push-all.sh should wait for GitHub checks to be registered before watching them")
+assert_contains(push_all, r"CHECK_DISCOVERY_TIMEOUT_SECONDS",
+                "push-all.sh should bound how long it waits for GitHub checks to appear")
 
 # .gitignore order check inside the checklist
 m = re.search(r"```gitignore\s*(.*?)```", checklist, flags=re.DOTALL)

@@ -26,6 +26,8 @@ DIRECT_REMOTES=(origin gitee)
 GITHUB_REMOTE=github
 GITHUB_REPO=mantaXray/trellis-mcu-templates
 PUSH_TIMEOUT_SECONDS="${PUSH_TIMEOUT_SECONDS:-30}"
+CHECK_DISCOVERY_TIMEOUT_SECONDS="${CHECK_DISCOVERY_TIMEOUT_SECONDS:-90}"
+CHECK_DISCOVERY_INTERVAL_SECONDS="${CHECK_DISCOVERY_INTERVAL_SECONDS:-5}"
 FAILED=()
 
 # 自动化脚本不能卡在交互式凭据提示；失败后进入总结区给修复建议。
@@ -41,6 +43,27 @@ run_git_push() {
   else
     git push "$remote" "$@"
   fi
+}
+
+wait_for_pr_checks_to_appear() {
+  local pr_url="$1"
+  local waited=0
+  local checks_probe=""
+
+  while [ "$waited" -le "$CHECK_DISCOVERY_TIMEOUT_SECONDS" ]; do
+    checks_probe=$("$GH_BIN" pr checks "$pr_url" \
+      --repo "$GITHUB_REPO" \
+      --json name 2>&1 || true)
+    if printf '%s\n' "$checks_probe" | grep -q '"name"'; then
+      return 0
+    fi
+
+    sleep "$CHECK_DISCOVERY_INTERVAL_SECONDS"
+    waited=$((waited + CHECK_DISCOVERY_INTERVAL_SECONDS))
+  done
+
+  printf '%s\n' "$checks_probe" | sed 's/^/      /'
+  return 1
 }
 
 # ----- 定位 gh CLI（PATH 可能没刷新认不到全局命令） -----
@@ -149,43 +172,50 @@ EOF
           FAILED+=("$GITHUB_REMOTE")
         else
           echo "    [github] PR: $pr_url"
-          echo "    [github] 等 CI（进度直出，不再静默）..."
-          # 不用 --required：Rulesets 没标 required check 时会秒退假装通过
-          if ! "$GH_BIN" pr checks "$pr_url" --repo "$GITHUB_REPO" --watch --fail-fast; then
-            echo "    [github] CI 未通过。手动处理：$pr_url"
+          echo "    [github] 等 CI check 挂载..."
+          if ! wait_for_pr_checks_to_appear "$pr_url"; then
+            echo "    [github] 超时仍未看到 CI check。手动处理：$pr_url"
             FAILED+=("$GITHUB_REMOTE")
+            echo ""
           else
-            echo "    [github] CI 通过 ✓"
-            echo "    [github] 合并 PR (admin self-merge)..."
-            if ! "$GH_BIN" pr merge "$pr_url" --repo "$GITHUB_REPO" --merge --admin --delete-branch; then
-              echo "    [github] merge 失败。手动处理：$pr_url"
+            echo "    [github] 等 CI（进度直出，不再静默）..."
+            # 不用 --required：Rulesets 没标 required check 时会秒退假装通过
+            if ! "$GH_BIN" pr checks "$pr_url" --repo "$GITHUB_REPO" --watch --fail-fast; then
+              echo "    [github] CI 未通过。手动处理：$pr_url"
               FAILED+=("$GITHUB_REMOTE")
             else
-              echo "    [github] merged + branch deleted ✓"
-
-              # ---- sync 前安全检查：本地 HEAD 没动 + working tree 干净 ----
-              current_head="$(git rev-parse HEAD)"
-              if [ "$current_head" != "$local_head" ]; then
-                echo "    [warn] 等 CI 期间本地 HEAD 动过 ($local_head → $current_head)"
-                echo "           跳过 reset --hard，自己 sync："
-                echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
-                FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
-              elif ! git diff --quiet || ! git diff --cached --quiet; then
-                echo "    [warn] working tree 有未提交改动，跳过 reset --hard"
-                echo "           处理完改动后自己 sync："
-                echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
-                FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
+              echo "    [github] CI 通过 ✓"
+              echo "    [github] 合并 PR (admin self-merge)..."
+              if ! "$GH_BIN" pr merge "$pr_url" --repo "$GITHUB_REPO" --merge --admin --delete-branch; then
+                echo "    [github] merge 失败。手动处理：$pr_url"
+                FAILED+=("$GITHUB_REMOTE")
               else
-                echo "    [github] sync 本地 + origin + gitee..."
-                git fetch "$GITHUB_REMOTE" >/dev/null 2>&1 || true
-                git reset --hard "$GITHUB_REMOTE/$BRANCH" >/dev/null 2>&1
-                for r in "${DIRECT_REMOTES[@]}"; do
-                  if ! run_git_push "$r" "$BRANCH" >/dev/null 2>&1; then
-                    echo "    [warn] sync push $r 失败，需手动 git push $r $BRANCH"
-                    FAILED+=("$r(待 sync)")
-                  fi
-                done
-                echo "    [github] 全部到 $(git rev-parse --short HEAD)"
+                echo "    [github] merged + branch deleted ✓"
+
+                # ---- sync 前安全检查：本地 HEAD 没动 + working tree 干净 ----
+                current_head="$(git rev-parse HEAD)"
+                if [ "$current_head" != "$local_head" ]; then
+                  echo "    [warn] 等 CI 期间本地 HEAD 动过 ($local_head → $current_head)"
+                  echo "           跳过 reset --hard，自己 sync："
+                  echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
+                  FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
+                elif ! git diff --quiet || ! git diff --cached --quiet; then
+                  echo "    [warn] working tree 有未提交改动，跳过 reset --hard"
+                  echo "           处理完改动后自己 sync："
+                  echo "             git fetch $GITHUB_REMOTE && git merge --ff-only $GITHUB_REMOTE/$BRANCH"
+                  FAILED+=("$GITHUB_REMOTE(已 merge，本地待手动 sync)")
+                else
+                  echo "    [github] sync 本地 + origin + gitee..."
+                  git fetch "$GITHUB_REMOTE" >/dev/null 2>&1 || true
+                  git reset --hard "$GITHUB_REMOTE/$BRANCH" >/dev/null 2>&1
+                  for r in "${DIRECT_REMOTES[@]}"; do
+                    if ! run_git_push "$r" "$BRANCH" >/dev/null 2>&1; then
+                      echo "    [warn] sync push $r 失败，需手动 git push $r $BRANCH"
+                      FAILED+=("$r(待 sync)")
+                    fi
+                  done
+                  echo "    [github] 全部到 $(git rev-parse --short HEAD)"
+                fi
               fi
             fi
           fi
